@@ -624,9 +624,18 @@ body {
     /* ===== RESULTS ===== */
     .results-page { padding: 32px 24px 48px; max-width: 1120px; margin: 0 auto; }
     .results-header {
-      display: flex; justify-content: space-between; align-items: flex-start;
+      display: flex; flex-wrap: wrap; align-items: flex-start;
       margin-bottom: 24px; gap: 16px;
     }
+    /* "Déplie" le wrapper sans classe généré par le JS (results-domain-row +
+       results-meta) pour que ses deux enfants deviennent des items flex à
+       part entière de .results-header : on peut alors les forcer chacun en
+       pleine largeur (flex-basis 100%) et les centrer réellement sur toute
+       la page, pendant que les boutons d'action gardent leur propre ligne
+       en haut à droite. Aucun changement de DOM/JS requis. */
+    .results-header > div:first-child { display: contents; }
+    .results-actions { order: 2; margin-left: auto; }
+    .results-domain-row { order: 1; }
     .results-domain {
       font-size: clamp(24px, 3vw, 32px);
       font-weight: 600; color: var(--text-bright);
@@ -636,9 +645,11 @@ body {
       line-height: 1.15;
     }
     .results-meta {
+      order: 3; flex: 1 1 100%;
       font-size: 12px; color: var(--text-dim); font-family: var(--mono);
       font-variant-numeric: tabular-nums;
       margin-top: 6px;
+      text-align: center;
     }
     .results-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; align-items: center; }
     /* Expires badge under the v2 action row. Pill-shaped so it reads as a
@@ -787,6 +798,27 @@ body {
     .cat-tile.cat-tier-context::before { background: var(--pivot); }
     .cat-tile.cat-tier-background { opacity: 0.88; }
     .cat-tile.cat-tier-background::before { background: var(--text-faint); }
+    /* Categories with 0 findings: dimmed so they read as "searched for, but
+       nothing here" rather than looking the same as a populated category. */
+    .cat-tile.is-empty { opacity: .42; box-shadow: none; }
+    .cat-tile.is-empty:hover { opacity: .8; }
+    .cat-tile.is-empty.active { opacity: 1; }
+    .cat-tile.is-empty .cat-tile-count { color: var(--text-faint); }
+    /* Legend for the tier colours used as the left-edge accent on each
+       category tile above. Static markup, same 4 fixed tiers every time. */
+    .cat-legend {
+      display: flex; flex-wrap: wrap; gap: 6px 18px;
+      margin-bottom: 14px;
+      font-family: var(--font); font-size: 12px; color: var(--text-dim);
+    }
+    .cat-legend-item { display: inline-flex; align-items: center; gap: 7px; }
+    .cat-legend-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .cat-legend-dot.cat-tier-leak { background: var(--red); }
+    .cat-legend-dot.cat-tier-pivot { background: var(--orange); }
+    .cat-legend-dot.cat-tier-context { background: var(--pivot); }
+    .cat-legend-dot.cat-tier-background { background: var(--text-faint); }
     .cat-tile-count {
       font-size: 20px; font-weight: 600; color: var(--text-bright);
       font-family: var(--mono); font-variant-numeric: tabular-nums;
@@ -1336,7 +1368,8 @@ body {
       background: rgba(255,255,255,.018);
     }
     .data-table tr:hover td { background: rgba(199,84,31,.08) !important; }
-    .data-table .col-sev { width: 12px; padding-right: 0; }
+    .data-table .col-sev { width: 12px; padding-right: 0; }
+    .data-table .col-favicon { width: 30px; padding-right: 0; padding-left: 4px; }
     .data-table .col-occ { width: 50px; text-align: right; }
     .data-table .col-date { width: 80px; }
     .data-table td.val {
@@ -2493,7 +2526,14 @@ body {
     }
     .data-table tr:hover .row-copy-btn { opacity: 1; }
     .row-copy-btn:hover { color: var(--accent); }
-    .row-copy-btn.copied { color: var(--green); opacity: 1; }
+    .row-copy-btn.copied { color: var(--green); opacity: 1; }
+    /* Small inline favicon thumbnail prepended to the value cell, only for
+       the "favicons" category rows. */
+    .row-favicon-thumb {
+      width: 18px; height: 18px; border-radius: 4px;
+      object-fit: contain; display: block;
+      background: var(--surface2); border: 1px solid var(--border);
+    }
 
     /* ===== RESPONSIVE ADDITIONS =====
        Tightens the existing 767/900/1199 media queries by adding small-
@@ -3064,35 +3104,66 @@ body {
     }
 
 
-    /* Prominent scan summary (replaces the small one-liner). */
+    /* Prominent scan summary -- dashboard-style stat cards (CSS only; the
+       markup/classes below are generated as-is by the existing JS template,
+       nothing here required a JS change). */
+    .results-meta { margin-top: 4px; }
     .results-meta .rm-line {
-      display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 22px;
-      font-family: var(--font); font-size: 14px; color: var(--text-dim);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+      align-items: stretch;
+      max-width: 720px;
+      margin-left: auto; margin-right: auto;
     }
-
-
-    .results-meta .rm-stat { white-space: nowrap; }
-
-
+    .results-meta .rm-stat {
+      display: flex; flex-direction: column; gap: 2px;
+      white-space: normal;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 12px 18px 13px;
+      font-family: var(--font); font-size: 12.5px; color: var(--text-dim);
+      box-shadow: var(--shadow-sm);
+    }
     .results-meta .rm-num {
-      font-family: var(--mono); font-size: 22px; font-weight: 700;
-      color: var(--text-bright); letter-spacing: -.01em; margin-right: 4px;
+      display: block;
+      font-family: var(--mono); font-size: 26px; font-weight: 700;
+      color: var(--text-bright); letter-spacing: -.01em; margin-right: 0;
+      line-height: 1.15;
     }
-
-
+    .results-meta .rm-stat:nth-of-type(1) .rm-num { color: var(--accent); }
+    .results-meta .rm-stat:nth-of-type(2) .rm-num { color: var(--pivot); }
+    .results-meta .rm-stat:nth-of-type(3) .rm-num { color: var(--purple); }
+    /* Spans the full width of the 3 cards above it. Split into 3 sub-spans
+       (start / elapsed time / end) by a small standalone script just after
+       #res-meta in the markup -- it only re-formats this one element after
+       the existing render function has run, it does not touch that function. */
     .results-meta .rm-range {
+      grid-column: 1 / -1;
+      display: flex; flex-direction: row; justify-content: space-between; align-items: center;
       font-family: var(--mono); font-size: 12px; color: var(--text-faint);
-      margin-left: auto; align-self: center;
+      background: var(--surface2); border: 1px dashed var(--border);
+      border-radius: var(--radius-lg);
+      padding: 12px 18px;
     }
-
+    .results-meta .rm-range-mid { color: var(--text-dim); font-size: 11px; letter-spacing: .02em; }
 
     .results-meta .rm-explain {
       font-family: var(--font); font-size: 12.5px; color: var(--text-faint);
-      line-height: 1.55; margin-top: 8px; max-width: 760px;
+      line-height: 1.55;
+      margin: 12px auto 0;
+      max-width: 720px;
+      text-align: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 12px 18px;
+      box-shadow: var(--shadow-sm);
     }
 
-
     .results-meta .rm-explain b { color: var(--text-dim); font-weight: 600; }
+
 
 
     .signals-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; }
@@ -3576,7 +3647,7 @@ body {
     .pivots { width: 100%; font-family: var(--font); }
 
 
-    .pivots svg { display: block; width: 100%; height: auto; }
+    .pivots svg { display: block; width: 100%; height: auto; overflow: visible; }
 
 
     .pivots-empty {
@@ -4529,6 +4600,48 @@ body {
           <span class="results-domain-tag mono">ARCHIVE</span>
         </div>
         <div class="results-meta" id="res-meta"></div>
+        <script>
+        (function () {
+          // Standalone, isolated from the app's own render function: it only
+          // re-formats the .rm-range box (start date / elapsed time / end
+          // date) every time #res-meta's content changes. It never reads or
+          // writes anything else, and the original renderer is untouched.
+          function formatElapsed(a, b) {
+            try {
+              var pa = a.split('-').map(Number), pb = b.split('-').map(Number);
+              var months = (pb[0] - pa[0]) * 12 + (pb[1] - pa[1]);
+              if (months < 0 || isNaN(months)) return '';
+              var y = Math.floor(months / 12), m = months % 12;
+              var parts = [];
+              if (y) parts.push(y + (y > 1 ? ' yrs' : ' yr'));
+              if (m || !y) parts.push(m + (m > 1 ? ' mos' : ' mo'));
+              return parts.join(' ');
+            } catch (_) { return ''; }
+          }
+          function splitRange() {
+            var box = document.querySelector('#res-meta .rm-range');
+            if (!box || box.dataset.wtSplit) return;
+            var raw = box.textContent.trim();
+            var sep = raw.indexOf('\u2192') !== -1 ? '\u2192' : (raw.indexOf('->') !== -1 ? '->' : null);
+            if (!sep) return;
+            var pieces = raw.split(sep).map(function (s) { return s.trim(); });
+            if (pieces.length !== 2) return;
+            var elapsed = formatElapsed(pieces[0], pieces[1]);
+            box.innerHTML =
+              '<span class="rm-range-start">' + pieces[0] + '</span>'
+              + '<span class="rm-range-mid">' + (elapsed || sep) + '</span>'
+              + '<span class="rm-range-end">' + pieces[1] + '</span>';
+            box.dataset.wtSplit = '1';
+          }
+          var target = document.getElementById('res-meta');
+          if (target) {
+            new MutationObserver(function () {
+              splitRange();
+            }).observe(target, { childList: true, subtree: true });
+            splitRange();
+          }
+        })();
+        </script>
       </div>
       <div class="results-actions">
         <button class="btn btn-accent" onclick="openTimeline()" data-i18n="Timeline">Timeline</button>
@@ -4536,7 +4649,6 @@ body {
         <button class="btn" onclick="reanalyze()" data-i18n="Re-analyze">Re-analyze</button>
       </div>
     </div>
-    <div id="res-favicons"></div>
     <div class="res-tabs" id="res-tabs">
       <div class="res-tabs-head" role="tablist">
         <button class="res-tab active" role="tab" data-tab="categories" onclick="selectResTab('categories')" data-i18n="Categories">Categories</button>
@@ -4544,8 +4656,15 @@ body {
         <button class="res-tab" role="tab" data-tab="pivots" onclick="selectResTab('pivots')" data-i18n="Pivots">Pivots</button>
         <button class="res-tab" role="tab" data-tab="subs" onclick="selectResTab('subs')" data-i18n="Subdomains">Subdomains</button>
         <button class="res-tab" role="tab" data-tab="tech" onclick="selectResTab('tech')" data-i18n="Tech &amp; infra">Tech &amp; infra</button>
+        <button class="res-tab" role="tab" data-tab="favicons" onclick="selectResTab('favicons')" data-i18n="Favicons">Favicons</button>
       </div>
       <div class="res-tab-panel" id="res-tab-categories" role="tabpanel">
+        <div class="cat-legend">
+          <span class="cat-legend-item"><span class="cat-legend-dot cat-tier-leak"></span>Leak</span>
+          <span class="cat-legend-item"><span class="cat-legend-dot cat-tier-pivot"></span>Pivot</span>
+          <span class="cat-legend-item"><span class="cat-legend-dot cat-tier-context"></span>Context</span>
+          <span class="cat-legend-item"><span class="cat-legend-dot cat-tier-background"></span>Background</span>
+        </div>
         <div id="res-catgrid" class="cat-section"></div>
         <div id="res-catdesc" class="cat-desc cat-desc-all"></div>
         <div class="filters-bar" id="res-filters">
@@ -4580,6 +4699,9 @@ body {
       </div>
       <div class="res-tab-panel" id="res-tab-tech" role="tabpanel" style="display:none">
         <div id="res-tech"></div>
+      </div>
+      <div class="res-tab-panel" id="res-tab-favicons" role="tabpanel" style="display:none">
+        <div id="res-favicons"></div>
       </div>
     </div>
   </div>
@@ -7599,7 +7721,7 @@ function renderSubdomainsTab() {
     ["hosting", "Hosting"],
   ];
   const PER_CAT_CAP = 10, TOTAL_CAP = 60, LABEL_MAX = 18;
-  const VB_W = 1000, VB_H = 700, CX = VB_W / 2, CY = VB_H / 2;
+  const VB_W = 1000, VB_H = 820, CX = VB_W / 2, CY = VB_H / 2;
   const CLUSTER_R = 235, LEAF_R = 92;
 
   function sev(s) {
@@ -7695,6 +7817,10 @@ function renderSubdomainsTab() {
     }
     function callSelect(cat) {
       if (typeof window.selectCategory === "function") window.selectCategory(cat);
+      // Jump back to the Categories tab so the (now filtered) table is
+      // actually visible -- selectCategory only updates the filter/data,
+      // it doesn't switch tabs on its own.
+      if (typeof window.selectResTab === "function") window.selectResTab("categories");
     }
 
     const centerNode = addNode(CX, CY, 26, "var(--accent)", trunc(root), root, {
@@ -9050,7 +9176,8 @@ function applyFilters() {
   // Sort
   filteredFindings.sort((a, b) => {
     let va = a[sortCol], vb = b[sortCol];
-    if (sortCol === 'occurrences') { va = Number(va)||0; vb = Number(vb)||0; }
+    if (sortCol === 'occurrences') { va = Number(va)||0; vb = Number(vb)||0; }
+    if (sortCol === '_emaildomain') { va = _emailDomain(a); vb = _emailDomain(b); }
     const cmp = typeof va === 'number' ? va - vb : String(va||'').localeCompare(String(vb||''));
     return sortDir === 'asc' ? cmp : -cmp;
   });
@@ -9070,12 +9197,90 @@ function applyFilters() {
   }
 }
 
+// Small inline thumbnail for the "favicons" category row in the findings
+// table. Self-contained (does not touch the dedicated gallery widget above
+// or any data-pipeline function): reuses the same archive.org/Google
+// fallback chain and the already-existing _faviconNextSrc/_faviconChk
+// handlers, just rendered at a smaller size next to the value text.
+function _rowFaviconThumb(f) {
+  const rawUrl = String(f.value || '');
+  if (!rawUrl) return '';
+  const meta = f.metadata || {};
+  const sourceUrl = meta.source_url || '';
+  const domainName = (_v2DomainInfoCache && _v2DomainInfoCache.name) || '';
+  let abs = '';
+  if (/^https?:\/\//i.test(rawUrl)) abs = rawUrl;
+  else if (rawUrl.startsWith('/') && domainName) abs = `https://${domainName}${rawUrl}`;
+  const tsMatch = sourceUrl.match(/\/web\/(\d+)\//);
+  const fsDigits = (f.first_seen || '').replace(/\D/g, '');
+  const ts = (tsMatch && tsMatch[1]) || (fsDigits.length >= 6 ? (fsDigits + '01000000').slice(0, 14) : '');
+  const host = domainName || (abs.match(/^https?:\/\/([^/]+)/) || [])[1] || '';
+  const cands = [];
+  if (abs && ts) cands.push(`https://web.archive.org/web/${ts}im_/${abs}`);
+  if (host) cands.push(`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`);
+  if (!cands.length) return '';
+  return `<img class="row-favicon-thumb" src="${esc(cands[0])}" data-srcs='${esc(JSON.stringify(cands))}' data-i="0" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="_faviconNextSrc(this)" onload="_faviconChk(this)">`;
+}
+
+// Small favicon for ANY row that has a domain (per _emailDomain below):
+// social profiles, subdomains, js/iframe/outgoing URLs, organizations, etc.
+// No archive.org lookup here -- this is "what does this site's icon look
+// like today", which is what identifies a destination at a glance -- so it
+// simply asks Google's favicon service for the domain's current icon.
+function _domainIconThumb(domain) {
+  if (!domain) return '';
+  const src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`;
+  return `<img class="row-favicon-thumb" src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer">`;
+}
+
+function _socialIconThumb(f) {
+  return _domainIconThumb(_emailDomain(f));
+}
+
+// Extract a hostname from any http(s) URL string. Returns '' if it doesn't
+// look like a URL at all.
+function _extractHostname(str) {
+  if (!str) return '';
+  const m = String(str).match(/^https?:\/\/([^\/:?#]+)/i);
+  return m ? m[1] : '';
+}
+
+// Domain associated with a finding, for the "Domain" column / sort. Works
+// across every category that carries a domain in some form:
+//   - emails             -> part after the last @
+//   - subdomains         -> the value itself already is a (sub)domain
+//   - everything else    -> the displayed value or the raw url/pivot_url
+//                           field, IF it looks like an http(s) URL
+//                           (js_urls, iframe_sources, linked_documents,
+//                           outgoing_links, social_profiles, rss_feeds,
+//                           sitemaps_and_robots, github_repos,
+//                           bug_bounty_programs, job_boards, auth_providers,
+//                           status_pages, pgp_keys, organizations,
+//                           favicons, and any future category shaped the
+//                           same way) automatically pick up a domain here;
+//                           categories with no URL anywhere just get ''.
+function _emailDomain(f) {
+  if (!f) return '';
+  const val = String(f.value || '');
+  if (f.category === 'emails') {
+    const at = val.lastIndexOf('@');
+    return at > -1 ? val.slice(at + 1) : '';
+  }
+  if (f.category === 'subdomains') {
+    return val.replace(/^https?:\/\//i, '').split('/')[0];
+  }
+  const it = f.metadata || {};
+  return _extractHostname(val) || _extractHostname(it.url) || _extractHostname(it.pivot_url) || '';
+}
+
 function renderFindingsTable() {
   const searchFilter = ($('filter-search').value || '').toLowerCase();
 
   const cols = [
     {key: '_sev', label: '', cls: 'col-sev', sortable: false},
+    {key: '_favicon', label: '', cls: 'col-favicon', sortable: false},
     {key: 'value', label: 'Value', cls: '', sortable: true},
+    {key: '_emaildomain', label: 'Domain', cls: 'col-date', sortable: true},
     {key: 'category', label: 'Category', cls: 'col-date', sortable: true},
     {key: 'first_seen', label: 'First', cls: 'col-date', sortable: true},
     {key: 'last_seen', label: 'Last', cls: 'col-date', sortable: true},
@@ -9115,6 +9320,13 @@ function renderFindingsTable() {
     const srcLink = makeSourceLink(f);
     const cells = visibleCols.map(c => {
       if (c.key === '_sev') return `<td class="col-sev">${sevDot}</td>`;
+      if (c.key === '_favicon') {
+        if (f.category === 'favicons') return `<td class="col-favicon">${_rowFaviconThumb(f)}</td>`;
+        return `<td class="col-favicon">${_domainIconThumb(_emailDomain(f))}</td>`;
+      }
+      if (c.key === '_emaildomain') {
+        return `<td class="col-date">${esc(_emailDomain(f) || '-')}</td>`;
+      }
       if (c.key === '_src') return `<td class="col-src">${srcLink}</td>`;
       if (c.key === 'value') {
         // Use data-copy-value + event delegation (wired below) instead of
@@ -9182,7 +9394,7 @@ function onSort(col) {
     sortDir = sortDir === 'asc' ? 'desc' : 'asc';
   } else {
     sortCol = col;
-    sortDir = (col === 'value' || col === 'category') ? 'asc' : 'desc';
+    sortDir = (col === 'value' || col === 'category' || col === '_emaildomain') ? 'asc' : 'desc';
   }
   applyFilters();
 }
