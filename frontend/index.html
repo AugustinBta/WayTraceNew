@@ -3303,6 +3303,7 @@ body {
 
 
     .scope-chip button:hover { color: var(--red, #e87060); }
+    .scope-chip-count { font-size: 10.5px; color: var(--text-faint); font-family: var(--font); white-space: nowrap; }
 
 
     .scope-excl-presets { margin-top: 10px; font-size: 11.5px; color: var(--text-faint); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -3314,7 +3315,71 @@ body {
     }
 
 
+    .scope-excl-presets button i { font-style: normal; opacity: .65; }
+
+
     .scope-excl-presets button:hover { border-color: var(--accent); color: var(--accent); border-style: solid; }
+
+    /* Step 3 (Timeline & density) is kept in the DOM -- removing it outright
+       would also remove #scope-histogram, and renderScopeTimeline() bails out
+       early when that element is missing, which would silently break
+       updateScopeEstimate() too (it's called at the end of that same
+       function). Hiding it via CSS keeps every existing computation working
+       exactly as before; only the visual card disappears. */
+    #scope-card-timeline { display: none !important; }
+
+    /* ===== Precise date range (new step 2) ===== */
+    .scope-daterange-row { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+    .scope-date-field { display: flex; flex-direction: column; gap: 4px; }
+    .scope-date-field label { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-faint); }
+    .scope-date-field input[type="date"] {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+      color: var(--text-bright); font-family: var(--mono); font-size: 12.5px;
+      padding: 7px 10px; outline: none; color-scheme: dark;
+    }
+    .scope-date-field input[type="date"]:focus { border-color: var(--accent); }
+    .scope-date-arrow { color: var(--text-faint); font-size: 14px; padding-bottom: 8px; }
+    .scope-date-apply {
+      background: var(--accent-gradient); color: var(--accent-text, #0b0f19); border: none;
+      border-radius: 7px; padding: 8px 16px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+      font-family: var(--font);
+    }
+    .scope-date-reset {
+      background: none; border: none; color: var(--text-faint);
+      font-size: 12px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+      padding-bottom: 9px;
+    }
+    .scope-date-note { font-size: 11.5px; color: var(--text-faint); margin-top: 10px; }
+    .scope-date-note b { color: var(--accent); }
+
+    /* ===== Site tree (new, sits under Exclude URLs) ===== */
+    .scope-tree-summary { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
+    .scope-tree-stat { font-size: 12px; color: var(--text-dim); }
+    .scope-tree-stat b { font-family: var(--mono); font-size: 15px; color: var(--text-bright); margin-right: 4px; }
+    .scope-tree {
+      border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg);
+      max-height: 340px; overflow-y: auto; padding: 4px 0;
+      font-family: var(--mono); font-size: 12.5px;
+    }
+    .scope-tree-node { user-select: none; }
+    .scope-tree-row { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 6px; cursor: pointer; }
+    .scope-tree-row:hover { background: var(--surface2); }
+    .scope-tree-row.excluded { opacity: .42; }
+    .scope-tree-row.excluded .scope-tree-name { text-decoration: line-through; }
+    .scope-tree-caret {
+      width: 14px; height: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      color: var(--text-faint); font-size: 10px; transition: transform .12s var(--ease-out); background: none; border: none; cursor: pointer; padding: 0;
+    }
+    .scope-tree-node.open > .scope-tree-row .scope-tree-caret { transform: rotate(90deg); }
+    .scope-tree-node.leaf .scope-tree-caret { visibility: hidden; }
+    .scope-tree-row input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; }
+    .scope-tree-icon { color: var(--text-faint); flex-shrink: 0; font-size: 12px; }
+    .scope-tree-name { color: var(--text-bright); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .scope-tree-count { font-size: 11px; color: var(--text-dim); background: var(--surface2); border-radius: 999px; padding: 1px 8px; flex-shrink: 0; }
+    .scope-tree-children { margin-left: 20px; padding-left: 8px; border-left: 1px dashed var(--border); display: none; }
+    .scope-tree-node.open > .scope-tree-children { display: block; }
+    .scope-tree-toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+    .scope-tree-toolbar .scope-filter { flex: 1; }
 
 
     /* Output checkbox */
@@ -4385,8 +4450,9 @@ body {
         WayTrace reads only what the <b>Wayback Machine</b> already archived for this
         domain. archive.org is rate-limited, so a scan samples a representative set
         of snapshots rather than every capture. Tune the scan below, then launch:
-        <b>1</b> pick subdomains, <b>2</b> drop noisy pages, <b>3</b> set the date
-        range and density. A bigger selection means a longer scan (capped at
+        <b>1</b> pick subdomains, <b>2</b> set a precise date range, <b>3</b> exclude
+        noisy URLs by keyword, <b>4</b> or directly in the site tree. A bigger
+        selection means a longer scan (capped at
         <b id="scope-intro-cap"></b> on the hosted service).
       </div>
       <!-- Subdomains -->
@@ -4401,18 +4467,8 @@ body {
         <div class="scope-list" id="scope-list"></div>
       </section>
 
-      <!-- Pages / paths -->
-      <section class="scope-card" id="scope-card-paths">
-        <div class="scope-card-head">
-          <div class="scope-card-title"><span class="scope-step-badge">2</span><span data-i18n="Pages">Pages</span> <span class="scope-card-meta" id="scope-paths-meta" data-i18n="most-archived paths. untick to skip a noisy section">most-archived paths. untick to skip a noisy section</span></div>
-          <div class="scope-card-tools">
-            <input class="scope-filter" id="scope-path-filter" placeholder="filter pages…" data-i18n-ph="filter pages…" spellcheck="false" oninput="renderScopePaths()">
-          </div>
-        </div>
-        <div class="scope-paths" id="scope-paths-list"></div>
-      </section>
-
-      <!-- Timeline & density -->
+      <!-- Timeline & density (kept in the DOM but hidden -- see #scope-card-timeline
+           CSS rule; renderScopeTimeline() still runs and still feeds the estimate) -->
       <section class="scope-card" id="scope-card-timeline">
         <div class="scope-card-head">
           <div class="scope-card-title"><span class="scope-step-badge">3</span><span data-i18n="Timeline &amp; density">Timeline &amp; density</span></div>
@@ -4433,10 +4489,32 @@ body {
         </div>
       </section>
 
+      <!-- Precise date range (new step 2) -->
+      <section class="scope-card" id="scope-card-daterange">
+        <div class="scope-card-head">
+          <div class="scope-card-title"><span class="scope-step-badge">2</span><span data-i18n="Precise date range">Precise date range</span></div>
+          <span class="scope-card-meta" data-i18n="day precision, optional">day precision, optional</span>
+        </div>
+        <div class="scope-daterange-row">
+          <div class="scope-date-field">
+            <label data-i18n="From">From</label>
+            <input type="date" id="scope-date-from">
+          </div>
+          <span class="scope-date-arrow">&rarr;</span>
+          <div class="scope-date-field">
+            <label data-i18n="To">To</label>
+            <input type="date" id="scope-date-to">
+          </div>
+          <button class="scope-date-apply" type="button" onclick="onScopeDateRangeApply()" data-i18n="Apply">Apply</button>
+          <button class="scope-date-reset" type="button" onclick="onScopeDateRangeReset()" data-i18n="Reset">Reset</button>
+        </div>
+        <div class="scope-date-note" id="scope-date-note"></div>
+      </section>
+
       <!-- Exclusions -->
       <section class="scope-card" id="scope-card-excl">
         <div class="scope-card-head">
-          <div class="scope-card-title"><span data-i18n="Exclude URLs">Exclude URLs</span> <span class="scope-card-meta" data-i18n="drop noisy paths by keyword (e.g. a whole blog)">drop noisy paths by keyword (e.g. a whole blog)</span></div>
+          <div class="scope-card-title"><span class="scope-step-badge">3</span><span data-i18n="Exclude URLs">Exclude URLs</span> <span class="scope-card-meta" data-i18n="drop noisy paths by keyword (e.g. a whole blog)">drop noisy paths by keyword (e.g. a whole blog)</span></div>
         </div>
         <div class="scope-excl-row">
           <input class="scope-filter" id="scope-excl-input" placeholder="type a word, press Enter, e.g. blog" data-i18n-ph="type a word, press Enter, e.g. blog" spellcheck="false"
@@ -4445,6 +4523,20 @@ body {
         </div>
         <div class="scope-chips" id="scope-excl-chips"></div>
         <div class="scope-excl-presets" id="scope-excl-presets"></div>
+      </section>
+
+      <!-- Site tree (new step 4) -->
+      <section class="scope-card" id="scope-card-tree">
+        <div class="scope-card-head">
+          <div class="scope-card-title"><span class="scope-step-badge">4</span><span data-i18n="Site tree">Site tree</span> <span class="scope-card-meta" data-i18n="uncheck a branch to exclude it from the scan">uncheck a branch to exclude it from the scan</span></div>
+        </div>
+        <div class="scope-tree-summary" id="scope-tree-summary"></div>
+        <div class="scope-tree-toolbar">
+          <button class="scope-mini-btn" type="button" onclick="scopeTreeSetAll(true)" data-i18n="Check all">Check all</button>
+          <button class="scope-mini-btn" type="button" onclick="scopeTreeSetAll(false)" data-i18n="Uncheck all">Uncheck all</button>
+          <input class="scope-filter" id="scope-tree-filter" placeholder="filter the tree…" data-i18n-ph="filter the tree…" spellcheck="false" oninput="renderScopeTree()">
+        </div>
+        <div class="scope-tree" id="scope-tree"></div>
       </section>
 
       <!-- Output -->
@@ -5166,7 +5258,27 @@ const I18N = {
     'Exclude URLs': 'Exclure des URL',
     'drop noisy paths by keyword (e.g. a whole blog)': 'écartez les chemins bruyants par mot-clé (ex. tout un blog)',
     'type a word, press Enter, e.g. blog': 'tapez un mot, Entrée, ex. blog',
-    'Add': 'Ajouter',
+    'Add': 'Ajouter',
+    // --- New scope step 2 (precise date range) ---
+    'Precise date range': 'Plage de dates précise',
+    'day precision, optional': 'au jour près, optionnel',
+    'From': 'Du',
+    'To': 'Au',
+    'Apply': 'Appliquer',
+    'Reset': 'Réinitialiser',
+    'the start': 'le début',
+    'the end': 'la fin',
+    'Common:': 'Suggestions :',
+    // --- New site tree (under Exclude URLs) ---
+    'Site tree': 'Arborescence du site',
+    'uncheck a branch to exclude it from the scan': "décochez une branche pour ne pas l'utiliser dans le scan",
+    'Check all': 'Tout cocher',
+    'Uncheck all': 'Tout décocher',
+    'filter the tree…': "filtrer l'arborescence…",
+    'pages archived in total': 'pages archivées au total',
+    'included': 'incluses',
+    'excluded': 'exclues',
+    'No pages match this filter.': 'Aucune page ne correspond à ce filtre.',
     'Launch scan': 'Lancer le scan',
     'Tune the scan before launching it.': 'Réglez le scan avant de le lancer.',
     'Querying archive.org for subdomains...': 'Interrogation d’archive.org pour les sous-domaines...',
@@ -6301,6 +6413,10 @@ async function loadScope(domain) {
   scopeRangeFrom = null; scopeRangeTo = null; scopeRangeAnchor = null; scopeDensityIdx = 2;
   scopeMonthFrom = null; scopeMonthTo = null;
   scopeDayFrom = null; scopeDayTo = null;
+  scopeTreeExpanded = new Set();
+  if ($('scope-date-from')) $('scope-date-from').value = '';
+  if ($('scope-date-to')) $('scope-date-to').value = '';
+  if ($('scope-date-note')) $('scope-date-note').textContent = '';
   $('scope-domain').textContent = domain;
   $('scope-sub').textContent = 'Tune the scan before launching it.';
   { const c = $('scope-intro-cap'); if (c) c.textContent = SCOPE_CAP.toLocaleString(); }
@@ -6348,10 +6464,11 @@ async function loadScope(domain) {
     if (capEl) capEl.textContent = SCOPE_CAP.toLocaleString();
     _applyScopePrefill();
     renderScopeSubList();
-    renderScopePaths();
+    renderScopeTree();
     if ($('scope-card-timeline')) $('scope-card-timeline').style.display = '';
     renderScopeChips();
     renderScopeTimeline();
+    updateScopeDateNote();
   } catch (e) {
     showFallbackScopeUI(domain, e.message);
   }
@@ -6374,6 +6491,8 @@ function _applyScopePrefill() {
     // Bridge the homepage month pre-filter to the day-precise range.
     if (scopeMonthFrom) scopeDayFrom = scopeMonthFrom.replace('-', '') + '01';
     if (scopeMonthTo) scopeDayTo = scopeMonthTo.replace('-', '') + '31';
+    if ($('scope-date-from') && scopeDayFrom) $('scope-date-from').value = _scopeDayToInputValue(scopeDayFrom);
+    if ($('scope-date-to') && scopeDayTo) $('scope-date-to').value = _scopeDayToInputValue(scopeDayTo);
   }
   const pubEl = document.getElementById('scope-publish-on-complete');
   if (pubEl && typeof p.publish === 'boolean') pubEl.checked = p.publish;
@@ -6390,7 +6509,8 @@ function showFallbackScopeUI(domain, detailMsg) {
   $('scope-loading').style.display = 'none';
   $('scope-adv').style.display = '';
   if ($('scope-card-subs')) $('scope-card-subs').style.display = 'none';
-  if ($('scope-card-paths')) $('scope-card-paths').style.display = 'none';
+  if ($('scope-card-daterange')) $('scope-card-daterange').style.display = 'none';
+  if ($('scope-card-tree')) $('scope-card-tree').style.display = 'none';
   if ($('scope-card-timeline')) $('scope-card-timeline').style.display = 'none';
   if ($('scope-estimate')) $('scope-estimate').style.display = 'none';
   // The guided intro describes the 1/2/3 cards, which are hidden in fallback.
@@ -6442,6 +6562,8 @@ function onScopeSubToggle(name, checked) {
   if (checked) scopeCheckedSubs.add(name); else scopeCheckedSubs.delete(name);
   renderScopeSubList();
   renderScopeTimeline();
+  renderScopeChips();
+  renderScopePresets();
 }
 
 function toggleAllScopes() {
@@ -6449,6 +6571,8 @@ function toggleAllScopes() {
   scopeCheckedSubs = allOn ? new Set() : new Set(scopeSubdomains.map(s => s.subdomain));
   renderScopeSubList();
   renderScopeTimeline();
+  renderScopeChips();
+  renderScopePresets();
 }
 
 // --- Pages / paths (step 2): show the most-archived paths with their share
@@ -6512,17 +6636,204 @@ function removeScopeKeyword(word) {
 function renderScopeChips() {
   const el = $('scope-excl-chips');
   if (!el) return;
-  el.innerHTML = scopeExcludeKeywords.map(k =>
-    `<span class="scope-chip">${esc(k)}<button type="button" aria-label="remove" onclick="removeScopeKeyword('${esc(k)}')">&times;</button></span>`
-  ).join('');
+  el.innerHTML = scopeExcludeKeywords.map(k => {
+    const n = _scopeKeywordMatchCount(k);
+    return `<span class="scope-chip">${esc(k)}<span class="scope-chip-count">${n} ${t('snapshots')}</span><button type="button" aria-label="remove" onclick="removeScopeKeyword('${esc(k)}')">&times;</button></span>`;
+  }).join('');
 }
 function renderScopePresets() {
   const el = $('scope-excl-presets');
   if (!el) return;
   const avail = SCOPE_EXCL_PRESETS.filter(p => !scopeExcludeKeywords.includes(p));
   el.innerHTML = avail.length
-    ? 'Common: ' + avail.map(p => `<button type="button" onclick="addScopeKeyword('${esc(p)}')">${esc(p)}</button>`).join('')
+    ? t('Common:') + ' ' + avail.map(p => {
+        const n = _scopeKeywordMatchCount(p);
+        return `<button type="button" onclick="addScopeKeyword('${esc(p)}')">${esc(p)} <i>(${n})</i></button>`;
+      }).join('')
     : '';
+}
+// How many discovered snapshots would a given exclude-keyword drop. Mirrors
+// the exact predicate _scopeInScope() uses (substring match on the URL), so
+// the number shown next to a chip/preset is the real, current impact.
+// How many currently-in-scope snapshots (checked subdomains + active day
+// range) a given exclude-keyword would additionally drop. Mirrors the same
+// predicate _scopeInScope() uses (substring match on the URL).
+function _scopeKeywordMatchCount(kw) {
+  const w = (kw || '').toLowerCase();
+  if (!w) return 0;
+  const hosts = _scopeCheckedHosts();
+  let n = 0;
+  for (const s of _scopeSnaps()) {
+    if (hosts.size && !hosts.has(s.host)) continue;
+    const day = s.ts.slice(0, 8);
+    if (scopeDayFrom != null && day < scopeDayFrom) continue;
+    if (scopeDayTo != null && day > scopeDayTo) continue;
+    if (s.url.toLowerCase().includes(w)) n++;
+  }
+  return n;
+}
+
+// --- Precise date range (step 2): plain day-precision <input type="date">
+// pair, bridged onto the same scopeDayFrom/scopeDayTo (YYYYMMDD strings)
+// already consumed by _scopeInScope() / _scopeAssembleSelected() -- no
+// change to either of those needed. ---
+function _scopeDayToInputValue(d) {
+  if (!d || d.length !== 8) return '';
+  return d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8);
+}
+function _scopeInputValueToDay(v) {
+  return v ? v.replace(/-/g, '') : null;
+}
+function onScopeDateRangeApply() {
+  scopeDayFrom = _scopeInputValueToDay($('scope-date-from')?.value || '');
+  scopeDayTo = _scopeInputValueToDay($('scope-date-to')?.value || '');
+  // Keep the month-level fields in sync too, since the (hidden) calendar /
+  // homepage prefill bridge still reads scopeMonthFrom/To elsewhere.
+  scopeMonthFrom = scopeDayFrom ? scopeDayFrom.slice(0, 4) + '-' + scopeDayFrom.slice(4, 6) : null;
+  scopeMonthTo = scopeDayTo ? scopeDayTo.slice(0, 4) + '-' + scopeDayTo.slice(4, 6) : null;
+  renderScopeTimeline();
+  renderScopeChips();
+  renderScopePresets();
+  updateScopeDateNote();
+}
+function onScopeDateRangeReset() {
+  if ($('scope-date-from')) $('scope-date-from').value = '';
+  if ($('scope-date-to')) $('scope-date-to').value = '';
+  scopeDayFrom = null; scopeDayTo = null;
+  scopeMonthFrom = null; scopeMonthTo = null;
+  renderScopeTimeline();
+  renderScopeChips();
+  renderScopePresets();
+  updateScopeDateNote();
+}
+function updateScopeDateNote() {
+  const note = $('scope-date-note');
+  if (!note) return;
+  if (!scopeDayFrom && !scopeDayTo) { note.textContent = ''; return; }
+  const total = _scopeSnaps().length;
+  const inRange = _scopeInScope().length;
+  const fromTxt = scopeDayFrom ? _scopeDayToInputValue(scopeDayFrom) : t('the start');
+  const toTxt = scopeDayTo ? _scopeDayToInputValue(scopeDayTo) : t('the end');
+  const tmpl = LANG === 'fr'
+    ? `Plage actuelle : <b>${esc(fromTxt)} \u2192 ${esc(toTxt)}</b> \u2014 environ <b>${inRange.toLocaleString()}</b> snapshots concern\u00e9s sur ${total.toLocaleString()} archiv\u00e9s.`
+    : `Current range: <b>${esc(fromTxt)} \u2192 ${esc(toTxt)}</b> \u2014 about <b>${inRange.toLocaleString()}</b> snapshots affected out of ${total.toLocaleString()} archived.`;
+  note.innerHTML = tmpl;
+}
+
+// --- Site tree (step 4): groups path_groups (real, flat preflight paths)
+// into a folder hierarchy by '/' segments. Unticking a node adds every real
+// path under it to scopeExcludedPaths -- the exact same Set _scopeInScope()
+// and _scopeAssembleSelected() already filter on, so this plugs straight
+// into the existing scan-selection logic with no change to either. ---
+let scopeTreeOpen = {};      // fullPath -> explicit expand/collapse override
+let _scopeTreeIndex = {};    // row id (this render only) -> array of pg.path
+
+function _scopeBuildTree() {
+  const root = { name: '', fullPath: '', count: 0, children: {}, paths: [] };
+  for (const pg of _scopePathGroups) {
+    if (!pg.path) continue;
+    const segs = pg.path.split('/').filter(Boolean);
+    root.count += pg.count || 0;
+    root.paths.push(pg.path);
+    if (segs.length === 0) {
+      if (!root.children['/']) root.children['/'] = { name: '/', fullPath: '/', count: 0, children: {}, paths: [] };
+      root.children['/'].count += pg.count || 0;
+      root.children['/'].paths.push(pg.path);
+      continue;
+    }
+    let cur = root, acc = '';
+    segs.forEach(seg => {
+      acc += '/' + seg;
+      if (!cur.children[seg]) cur.children[seg] = { name: seg, fullPath: acc, count: 0, children: {}, paths: [] };
+      cur.children[seg].count += pg.count || 0;
+      cur.children[seg].paths.push(pg.path);
+      cur = cur.children[seg];
+    });
+  }
+  return root;
+}
+function _scopeTreeDefaultOpen(fullPath) {
+  return fullPath.split('/').filter(Boolean).length <= 1;
+}
+function _scopeTreeNodeExcluded(paths) {
+  return paths.length > 0 && paths.every(p => scopeExcludedPaths.has(p));
+}
+function renderScopeTree() {
+  const host = $('scope-tree');
+  const card = $('scope-card-tree');
+  if (!host) return;
+  const groups = _scopePathGroups.filter(pg => pg.path);
+  if (!groups.length) { if (card) card.style.display = 'none'; return; }
+  if (card) card.style.display = '';
+  const tree = _scopeBuildTree();
+  _scopeTreeIndex = {};
+  let nextId = 0;
+  const q = ($('scope-tree-filter')?.value || '').trim().toLowerCase();
+
+  function matches(node) {
+    if (!q) return true;
+    if (node.fullPath.toLowerCase().includes(q)) return true;
+    return Object.keys(node.children).some(k => matches(node.children[k]));
+  }
+  function renderNode(node, depth) {
+    if (!matches(node)) return '';
+    const id = nextId++;
+    _scopeTreeIndex[id] = node.paths;
+    const childKeys = Object.keys(node.children).sort();
+    const isLeaf = childKeys.length === 0;
+    const isOpen = node.fullPath in scopeTreeOpen
+      ? scopeTreeOpen[node.fullPath]
+      : (q ? true : _scopeTreeDefaultOpen(node.fullPath));
+    const off = _scopeTreeNodeExcluded(node.paths);
+    const icon = isLeaf ? '\uD83D\uDCC4' : '\uD83D\uDCC1';
+    const childrenHtml = !isLeaf
+      ? `<div class="scope-tree-children">${childKeys.map(k => renderNode(node.children[k], depth + 1)).join('')}</div>`
+      : '';
+    return `
+      <div class="scope-tree-node${isLeaf ? ' leaf' : ''}${isOpen ? ' open' : ''}">
+        <div class="scope-tree-row${off ? ' excluded' : ''}">
+          <button type="button" class="scope-tree-caret" onclick="onScopeTreeCaret('${esc(node.fullPath)}')" aria-label="expand">&#9656;</button>
+          <input type="checkbox" ${off ? '' : 'checked'} onchange="onScopeTreeToggle(${id}, this.checked)">
+          <span class="scope-tree-icon">${icon}</span>
+          <span class="scope-tree-name">${esc(node.name || '/')}</span>
+          <span class="scope-tree-count">${node.count}</span>
+        </div>
+        ${childrenHtml}
+      </div>`;
+  }
+
+  const topKeys = Object.keys(tree.children).sort();
+  const html = topKeys.map(k => renderNode(tree.children[k], 0)).join('');
+  host.innerHTML = html || `<div class="scope-tree-empty">${esc(t('No pages match this filter.'))}</div>`;
+
+  const summary = $('scope-tree-summary');
+  if (summary) {
+    const totalPages = groups.length;
+    const excluded = groups.filter(pg => scopeExcludedPaths.has(pg.path)).length;
+    summary.innerHTML =
+      `<span class="scope-tree-stat"><b>${totalPages}</b>${esc(t('pages archived in total'))}</span>` +
+      `<span class="scope-tree-stat"><b>${totalPages - excluded}</b>${esc(t('included'))}</span>` +
+      `<span class="scope-tree-stat"><b>${excluded}</b>${esc(t('excluded'))}</span>`;
+  }
+}
+function onScopeTreeCaret(fullPath) {
+  const cur = fullPath in scopeTreeOpen ? scopeTreeOpen[fullPath] : _scopeTreeDefaultOpen(fullPath);
+  scopeTreeOpen[fullPath] = !cur;
+  renderScopeTree();
+}
+function onScopeTreeToggle(id, checked) {
+  const paths = _scopeTreeIndex[id] || [];
+  for (const p of paths) { if (checked) scopeExcludedPaths.delete(p); else scopeExcludedPaths.add(p); }
+  renderScopeTree();
+  renderScopeTimeline();
+  updateScopeDateNote();
+}
+function scopeTreeSetAll(checked) {
+  if (checked) scopeExcludedPaths.clear();
+  else for (const pg of _scopePathGroups) if (pg.path) scopeExcludedPaths.add(pg.path);
+  renderScopeTree();
+  renderScopeTimeline();
+  updateScopeDateNote();
 }
 
 function _scopeSnaps() {
